@@ -1,0 +1,53 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: "AWS::Serverless-2016-10-31"
+
+Parameters:
+  VPCId:
+    Type: String
+  LambdaSubnetCidrBlock:
+    Type: String
+  LambdaSecurityGroupCidrBlock:
+    Type: String
+
+Resources:
+  # new subnet and sg. -------------------------------------
+  SampleLambdaSubnetA:
+    Type: "AWS::EC2::Subnet"
+    Properties:
+      AvailabilityZone: "ap-northeast-1a"
+      CidrBlock: !Ref LambdaSubnetCidrBlock
+      VpcId: !Ref VPCId
+      Tags:
+        - Key: Name
+          Value: "sample-lambda-subnet-1a"
+  SampleLambdaSecurityGroup:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupDescription: Lambda SecurityGroup
+      VpcId: !Ref VPCId
+
+  # new vpcendpoint. -------------------------------------
+  SampleLambdaVpcEndpoint:
+    Type: "AWS::EC2::VPCEndpoint"
+    Properties:
+      PrivateDnsEnabled: false
+      SecurityGroupIds:
+        - !Ref SampleLambdaSecurityGroup
+      ServiceName: "com.amazonaws.ap-northeast-1.execute-api"
+      VpcEndpointType: Interface
+      SubnetIds:
+        - !Ref SampleLambdaSubnetA
+      VpcId: !Ref VPCId
+
+  # lambda -------------------------------------
+  SampleFunctionLambda:
+    Type: "AWS::Serverless::Function"
+    Properties:
+      Handler: sample-function.handler
+      Runtime: nodejs12.x
+      Timeout: 10
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref SampleLambdaSecurityGroup
+        SubnetIds:
+          - !Ref SampleLambdaSubnetA

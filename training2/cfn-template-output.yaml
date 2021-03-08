@@ -1,0 +1,120 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: create lambda with vpc.
+Transform: AWS::Serverless-2016-10-31
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 172.32.0.0/16
+      EnableDnsSupport: false
+      EnableDnsHostnames: false
+      Tags:
+      - Key: Name
+        Value: sample-function-vpc
+  PrivateSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPC
+      CidrBlock: 172.32.0.0/24
+      AvailabilityZone: ap-northeast-1a
+      Tags:
+      - Key: Name
+        Value: sample-function-private-subnet-a
+  PrivateSubnetC:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:
+        Ref: VPC
+      CidrBlock: 172.32.1.0/24
+      AvailabilityZone: ap-northeast-1c
+      Tags:
+      - Key: Name
+        Value: sample-function-private-subnet-c
+  VPCPrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:
+        Ref: VPC
+  VPCPrivateSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        Ref: PrivateSubnetA
+      RouteTableId:
+        Ref: VPCPrivateRouteTable
+  VPCPrivateSubnetCRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId:
+        Ref: PrivateSubnetC
+      RouteTableId:
+        Ref: VPCPrivateRouteTable
+  VpcEndpointSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: VPCEndpoint Security Group
+      VpcId:
+        Ref: VPC
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '443'
+        ToPort: '443'
+        SourceSecurityGroupId:
+          Ref: SampleFunctionSecurityGroup
+  SampleFunctionVpcEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PrivateDnsEnabled: false
+      SecurityGroupIds:
+      - Ref: VpcEndpointSecurityGroup
+      ServiceName: com.amazonaws.ap-northeast-1.execute-api
+      VpcEndpointType: Interface
+      SubnetIds:
+      - Ref: PrivateSubnetA
+      - Ref: PrivateSubnetC
+      VpcId:
+        Ref: VPC
+  SampleFunctionSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: SampleFunction Security Group
+      VpcId:
+        Ref: VPC
+  SampleFunctionApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: dev
+      EndpointConfiguration:
+        Type: PRIVATE
+      Auth:
+        ResourcePolicy:
+          CustomStatements:
+          - Effect: Allow
+            Principal: '*'
+            Action: execute-api:Invoke
+            Resource: execute-api:/dev/get
+            Condition:
+              IpAddress:
+                aws:SourceIp: '*.*.*.*'
+  SampleFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: sample-function.handler
+      Runtime: nodejs12.x
+      Timeout: 10
+      VpcConfig:
+        SecurityGroupIds:
+        - Ref: SampleFunctionSecurityGroup
+        SubnetIds:
+        - Ref: PrivateSubnetA
+        - Ref: PrivateSubnetC
+      Events:
+        GetApi:
+          Type: Api
+          Properties:
+            Path: /get
+            Method: get
+            RestApiId:
+              Ref: SampleFunctionApi
+      CodeUri: s3://sakai-cfn-deployments/d45a3d98c82185b66a44b1ac902bae86

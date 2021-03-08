@@ -1,0 +1,28 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description:
+  VPC Create
+
+Metadata:
+  "AWS::CloudFormation::Interface":
+    ParameterGroups:
+      - Label:
+          default: "Project Name Prefix"
+        Parameters:
+          - PJPrefix
+
+# Input Parameters
+Parameters:
+  PJPrefix:
+    Type: String
+
+Resources:
+# VPC Create
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 172.32.0.0/16
+      EnableDnsSupport: false
+      EnableDnsHostnames: false
+      Tags:
+        - Key: Name
+          Value: !Sub "${PJPrefix}-vpc"
